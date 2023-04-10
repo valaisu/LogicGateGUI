@@ -8,20 +8,25 @@
 #TODO: add connections also to the scene itself
 
 import pygame
-from typing import Type
+#from typing import Type
 
 
-class inOut:
-    def __init__(self, isInput, id, connections):
-        self.isInput = isInput
+class input:
+    def __init__(self, id, connections):
         self.id = id
         self.connections = connections
+    def addConnection(self, connection): # connection consists of (buttonId, connectionId) pairs
+        self.connections.append(connection)
 
+class output:
+    def __init__(self, id, connections):
+        self.id = id
+        self.connections = connections
     def addConnection(self, connection): # connection consists of (buttonId, connectionId) pairs
         self.connections.append(connection)
 
 class button:
-    def __init__(self, mid, width, height, color, colorHover, text, textColor, draggable):
+    def __init__(self, mid, width, height, color, colorHover, text, textColor, draggable, inputs, outputs):
         self.mid = mid #coord 0,0 at upper left corner
         self.width = width
         self.height = height
@@ -37,13 +42,16 @@ class button:
 
         self.draggable = draggable
 
+        self.inputs = inputs
+        self.outputs = outputs
+
 addedBtnCount = 0
 color = (255, 255, 255) # white
 color_light = (170, 170, 170)
 color_dark = (100, 100, 100)
 
 def add_button(btnlist, text):
-    btnlist.append(button((60 + addedBtnCount*100, 690), 80, 30, color_dark, color_light, text, (30, 30, 30), True))
+    btnlist.append(button((60 + addedBtnCount*100, 690), 80, 30, color_dark, color_light, text, (30, 30, 30), True, [input(0, -1)], [output(0, -1)]))
 
 def updateBtn(mid, button):
 #def updateBtn(mid, button: Type[button]):
@@ -71,8 +79,8 @@ smallfont = pygame.font.SysFont('Corbel', 35)
 text = smallfont.render('quit', True, color)
 
 
-quitButton = button([200, 200], 100, 30, color_dark, color_light, "quit", (30, 30, 30), False)
-addButton = button([200, 300], 100, 30, color_dark, color_light, "add", (30, 30, 30), False)
+quitButton = button([200, 200], 100, 30, color_dark, color_light, "quit", (30, 30, 30), False, [input(0, -1)], [output(0, -1)])
+addButton = button([200, 300], 100, 30, color_dark, color_light, "add", (30, 30, 30), False, [input(0, -1)], [output(0, -1)])
 
 buttons = [quitButton, addButton]
 
@@ -130,13 +138,20 @@ while True:
                 pygame.draw.rect(screen, buttons[i].color, [mouse[0] - buttons[i].width / 2, mouse[1] - buttons[i].height / 2, buttons[i].width, buttons[i].height])
             else:
                 pygame.draw.rect(screen, buttons[i].color, [buttons[i].left, buttons[i].top, buttons[i].width, buttons[i].height])
+        inputC = len(buttons[i].inputs)
+        for j in range(inputC):
+            pygame.draw.circle(screen, (0, 0, 0),(buttons[i].left, buttons[i].top + buttons[i].height * (j + 1) / (inputC + 1)), 5)
+        outputC = len(buttons[i].outputs)
+        for j in range(inputC):
+            pygame.draw.circle(screen, (0, 0, 0),(buttons[i].right, buttons[i].top + buttons[i].height * (j + 1) / (outputC + 1)), 5)
 
     # add text on buttons
     for i in range(len(buttons)):
         if dragging and i == moveInfo[2]:
-            screen.blit(buttons[i].text, (mouse[0] - buttons[i].width / 2, mouse[1] - buttons[i].height / 2))
+            screen.blit(buttons[i].text, (mouse[0] - buttons[i].width / 2 + 10, mouse[1] - buttons[i].height / 2))
         else:
-            screen.blit(buttons[i].text, (buttons[i].left, buttons[i].top))
+            screen.blit(buttons[i].text, (buttons[i].left + 10, buttons[i].top))
     pygame.draw.line(screen, (0,0,0), (50, 50), (200, 50))
+    pygame.draw.circle(screen, (0,0,0), (50,50), 5)
     # updates the frames of the game
     pygame.display.update()
