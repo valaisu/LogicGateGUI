@@ -51,6 +51,10 @@ class button:
     def bottom(self): return self.LUcorner[1] + 30 + max(max(len(self.inputs), len(self.outputs))-1, 0) * 20
     def height(self): return self.bottom()-self.top()
 
+    def outputPos(self, index):
+        pass
+
+
 addedBtnCount = 0
 color = (255, 255, 255) # white
 color_light = (170, 170, 170)
@@ -70,7 +74,7 @@ def getInputs(buttonList):
         l = len(buttonList[i].inputs)
         for j in range(l):
             connections.append([buttonList[i].left(), buttonList[i].top() + buttonList[i].height()*(j+0.5)/l, i, j])
-    return connections
+    return connections # returns a list of [btn left, btn right, btn index, input index]
 
 def getOutputs(buttonList):
     connections = []
@@ -92,26 +96,20 @@ height = screen.get_height()
 
 # defining a font
 smallfont = pygame.font.SysFont('Corbel', 35)
-
-# rendering a text written in
-# this font
 text = smallfont.render('quit', True, color)
 
-quitButton = button(0, (200, 200), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "quit", "pygame.quit")
+quitButton = button(0, (200, 200), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1)), output(0, (-1, -1))], "quit", "pygame.quit")
 addButton  = button(1, (200, 300), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "add", "addBtn")
-#quitButton = button([200, 200], 100, 30, color_dark, color_light, "quit", (30, 30, 30), False, [input(0, -1)], [output(0, -1), output(0, -1)])
-#addButton = button([200, 300], 100, 30, color_dark, color_light, "add", (30, 30, 30), False, [input(0, -1),input(0, -1), input(0, -1)], [output(0, -1)])
 
 buttons = [quitButton, addButton]
 connectionList = []
-lines = []
-linesV2 = []
+
 
 
 dragging = False
 dragLine = False
 moveInfo = [(0,0),(0,0),-1]
-lineStart = (0,0)
+lineStart = [0,0,0,0]
 # = mouseCoords, buttonCoords, i
 
 commandDictionary = {"pygame.quit": pygame.quit, "addBtn": addButton}
@@ -129,13 +127,12 @@ while True:
             pygame.quit()
 
         if ev.type == pygame.MOUSEBUTTONDOWN:
-            print(inputList)
-            [print(buttons[i].LUcorner, buttons[i].left()) for i in range(len(buttons))]
+            #print(inputList)
+            #[print(buttons[i].LUcorner, buttons[i].left()) for i in range(len(buttons))]
             for i in range(len(inputList)):
                 if inputList[i][0]-7 <= mouse[0] <= inputList[i][0]+7 and inputList[i][1]-7 <= mouse[1] <= inputList[i][1]+7:
                     dragLine = True
-                    lineStart = (inputList[i][0], inputList[i][1])
-
+                    lineStart = inputList[i]
 
             for i in range(len(buttons)):
                 if dragLine:
@@ -150,40 +147,22 @@ while True:
                     elif buttons[i].draggable:
                         dragging = True
                         moveInfo = [mouse, buttons[i].LUcorner, i]
-                    '''try:
-                        commandDictionary[buttons[i].command]()
-                    except KeyError:
-                        pass'''
-                    '''if i == 0:
-                        pygame.quit()
-                    if i == 1:
-                        text = "test" + str(addedBtnCount)
-                        add_button(buttons, text)
-                        addedBtnCount += 1
-                        getInputs(buttons)
-                    if buttons[i].draggable:
-                        dragging = True
-                        #moveInfo = [mouse, buttons[i].mid, i]'''
 
         if ev.type == pygame.MOUSEBUTTONUP:
             if dragging:
                 dragging = False
                 update_btn_pos(buttons, moveInfo[2], mouse)
                 buttons[moveInfo[2]].LUcorner = (mouse[0] - buttons[moveInfo[2]].width / 2, mouse[1] - buttons[moveInfo[2]].height()/2)
-                #updateBtn(mouse, buttons[moveInfo[2]])
 
             if dragLine:
                 dragLine = False
                 for i in range(len(outputList)):
                     if outputList[i][0] - 7 <= mouse[0] <= outputList[i][0] + 7 and outputList[i][1] - 7 <= mouse[1] <= outputList[i][1] + 7:
-                        lines.append([lineStart, (outputList[i][0], outputList[i][1])])
-                        linesV2.append([lineStart, (outputList[i][2], outputList[i][3], outputList[i][4])])
-                        #                           pos in buttons  , pos in button   , button length
-
+                        buttons[outputList[i][2]].outputs[outputList[i][3]].connections = (lineStart[2], lineStart[3])
 
     screen.fill((60, 60, 60))
 
-
+    # DRAWING THE BUTTONS
     # if mouse is hovered on a button it
     # changes to lighter shade
     for i in range(len(buttons)):
@@ -197,6 +176,7 @@ while True:
                 pygame.draw.rect(screen, buttons[i].color, [mouse[0] - buttons[i].width / 2, mouse[1] - buttons[i].height() / 2, buttons[i].width, buttons[i].height()])
             else:
                 pygame.draw.rect(screen, buttons[i].color, [buttons[i].left(), buttons[i].top(), buttons[i].width, buttons[i].height()])
+        # Draw in/outputs
         inputC = len(buttons[i].inputs)
         for j in range(inputC):
             pygame.draw.circle(screen, (0, 0, 0),(buttons[i].left(), buttons[i].top() + buttons[i].height() * (j + 0.5) / (inputC)), 5)
@@ -212,12 +192,18 @@ while True:
             screen.blit(buttons[i].text, (buttons[i].left() + 10, buttons[i].top() + buttons[i].height()/2 - 15))
 
     if dragLine:
-        pygame.draw.line(screen, (0, 0, 0), lineStart, mouse)
-    for i in range(len(lines)):
-        pygame.draw.line(screen, (0, 0, 0), lines[i][0], lines[i][1])
-    for i in range(len(linesV2)):
-        pygame.draw.line(screen, (0, 0, 0), lines[i][0], lines[i][1])
-    pygame.draw.line(screen, (0,0,0), (50, 50), (200, 50))
-    pygame.draw.circle(screen, (0,0,0), (50,200), 5)
+        pygame.draw.line(screen, (0, 0, 0), (lineStart[0], lineStart[1]), mouse)
+
+    # Draw the connections between the buttons
+    for i in range(len(buttons)):
+        for j in range(len(buttons[i].outputs)):
+            if buttons[i].outputs[j].connections[0] != -1:
+                outputC = len(buttons[i].outputs)
+                outLoc = (buttons[i].right(), buttons[i].top() + buttons[i].height() * (j + 0.5) / (outputC))
+                inputIds = buttons[i].outputs[j].connections
+                inputC = len(buttons[inputIds[0]].inputs)
+                inLoc = (buttons[inputIds[0]].left(), buttons[inputIds[0]].top() + buttons[inputIds[0]].height() * (inputIds[1] + 0.5) / (inputC))
+                pygame.draw.line(screen, (0, 0, 0), outLoc, inLoc)
+
     # updates the frames of the game
     pygame.display.update()
