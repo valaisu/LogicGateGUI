@@ -3,16 +3,13 @@
 # for example from
 # https://www.youtube.com/watch?v=QZwneRb-zqA&t=194s
 
-#TODO: add draggable buttons CHECK
-#TODO: the height of the buttons depends on the amount of connections they have CHECK
-#TODO: add ability to make connections between buttons CHECK
-
-#TODO: improve the data structure, redesign class button and add class connection CHECK
-
-#TODO: add connections also to the scene itself CHECK
+# TODO: output data from the scene
+# TODO: change the values of the data coming n to the scene CHECK
+# TODO: (optional) add tools for editing the buttons/connections
+# TODO: make the buttons represent logical ports
 
 import pygame
-#from typing import Type
+# from typing import Type
 
 
 class input:
@@ -55,17 +52,26 @@ class button:
         pass
 
 
+class functionalButton:
+    def __init__(self, LUcorner, width, height, text, function, parameter):
+        self.LUcorner = LUcorner
+        self.width = width
+        self.height = height
+        self.function = function
+        self.text = smallfont.render(text, True, color_black)
+        self.parameter = parameter
+
+
 class sceneOutput:
     def __init__(self, top, bottom, right, outputs):
         self.LUcorner = (0, top)
         self.RDcorner = (right, bottom)
         self.width = right
-        #self.top = top
-        #self.bottom = bottom
-        #self.right = right
+        self.outputVals = []
         self.outputs = []
         for i in range(outputs):
             self.outputs.append(output(i, (-1, -1)))
+            self.outputVals.append(0)
 
     def right(self): return self.RDcorner[0]
     def left(self): return self.LUcorner[0]
@@ -122,6 +128,7 @@ def getOutputs(buttonList):
     return connections
 
 
+
 pygame.init()
 res = (1500, 800)
 
@@ -137,7 +144,11 @@ text = smallfont.render('quit', True, color)
 
 sceneOutput = sceneOutput(60, 680, 100, 2)
 quitButton = button(0, (10, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "quit", "pygame.quit")
-addButton  = button(1, (130, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "add", "addBtn")
+addButton = button(1, (130, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "add", "addBtn")
+
+funcButtons = []
+for i in range(2): #TODO: the positions of the buttons are wrong, fix this
+    funcButtons.append(functionalButton((30, 300+i*200), 30, 30, "0", "binary", i))
 
 buttons = [sceneOutput, quitButton, addButton]
 connectionList = []
@@ -172,6 +183,10 @@ while True:
                     print(outputList)
                     lineStart = outputList[i]
                     print(i, lineStart)
+            # check if we are clicking a functional button
+            for i in range(len(funcButtons)):
+                if funcButtons[i].LUcorner[0] <= mouse[0] <= funcButtons[i].LUcorner[0] + funcButtons[i].width and funcButtons[i].LUcorner[1] <= mouse[1] <= funcButtons[i].LUcorner[1] + funcButtons[i].height:
+                    sceneOutput.outputVals[i] = (sceneOutput.outputVals[i]+1)%2
             # check if we are clicking a button
             for i in range(1, len(buttons)):
                 if dragLine:
@@ -204,7 +219,7 @@ while True:
     screen.fill((60, 60, 60))
     pygame.draw.line(screen, color_black, (0, 60), (1500, 60))
     pygame.draw.line(screen, color_black, (0, 740), (1500, 740))
-    pygame.draw.circle(screen, color_black, (100, 215), 8) #TODO: here youll find the root of the errors, probably should make the scene output more alike with the buttons so all same commands can be applied
+    pygame.draw.circle(screen, color_black, (100, 215), 8)
 
     # Draw the scene output
     pygame.draw.rect(screen, color_light, [0, sceneOutput.top(), sceneOutput.right(), sceneOutput.bottom()])
@@ -213,11 +228,18 @@ while True:
         pygame.draw.circle(screen, color_black, (outputList[i][0], outputList[i][1]), 5)
 
     # DRAWING THE BUTTONS
+    # functional buttons
+    for i in range(len(funcButtons)):
+        if funcButtons[i].LUcorner[0] <= mouse[0] <= funcButtons[i].LUcorner[0]+funcButtons[i].width and funcButtons[i].LUcorner[1] <= mouse[1] <= funcButtons[i].LUcorner[1]+funcButtons[i].height:
+            pygame.draw.rect(screen, color_light, [funcButtons[i].LUcorner[0], funcButtons[i].LUcorner[1], funcButtons[i].width, funcButtons[i].height])
+        else:
+            pygame.draw.rect(screen, color_dark, [funcButtons[i].LUcorner[0], funcButtons[i].LUcorner[1], funcButtons[i].width, funcButtons[i].height])
+    # connectable buttons
     for i in range(1, len(buttons)):
         # if we hover over a button, make the color lighter
         if buttons[i].left() <= mouse[0] <= buttons[i].right() and buttons[i].top() <= mouse[1] <= buttons[i].bottom():
             # if we are dragging a button, it's position has not officially yet changed
-            # so it needs to be drawn differently frm the rest of the buttons
+            # ,so it needs to be drawn differently frm the rest of the buttons
             if dragging and i == moveInfo[2]:
                 pygame.draw.rect(screen, buttons[i].colorHover, [mouse[0]-buttons[i].width/2, mouse[1]-buttons[i].height()/2, buttons[i].width, buttons[i].height()])
             else:
@@ -237,6 +259,8 @@ while True:
             pygame.draw.circle(screen, (0, 0, 0),(buttons[i].right(), buttons[i].top() + buttons[i].height() * (j + 0.5) / (outputC)), 5)
 
     # add text on buttons
+    for i in range(len(funcButtons)):
+        screen.blit(smallfont.render(str(sceneOutput.outputVals[i]), True, color_black), funcButtons[i].LUcorner)
     for i in range(1, len(buttons)):
         if dragging and i == moveInfo[2]:
             screen.blit(buttons[i].text, (mouse[0] - buttons[i].width / 2 + 10, mouse[1] - buttons[i].height() / 2))
