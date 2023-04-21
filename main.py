@@ -12,6 +12,19 @@ import pygame
 # from typing import Type
 
 
+class logicBlock:
+    def __init__(self, parent, children, operation):
+        self.parent = parent
+        self.children = children
+        self.operation = operation
+        self.value = 0
+
+
+def bond(parent, child):
+    parent.children.append(child)
+    child.parent = parent
+
+
 class input:
     def __init__(self, id, connections):
         self.id = id
@@ -27,7 +40,7 @@ class output:
         self.connections.append(connection)
 
 class button:
-    def __init__(self, id, LUcorner, color, draggable, inputs, outputs, text, command):
+    def __init__(self, id, LUcorner, color, draggable, inputs, outputs, text, command, outputValue, logicBlock):
         self.id = id
         self.text = smallfont.render(text, True, color_black)
         self.LUcorner = LUcorner
@@ -42,6 +55,11 @@ class button:
         self.width = self.right()-self.left()
 
         self.command = command
+
+        self.outputValue = outputValue
+
+        self.logicBlock = logicBlock
+
     def left(self): return self.LUcorner[0]
     def right(self): return self.LUcorner[0]+100
     def top(self): return self.LUcorner[1]
@@ -69,9 +87,14 @@ class sceneOutput:
         self.width = right
         self.outputVals = []
         self.outputs = []
+        self.logicBlocks = []
         for i in range(outputs):
             self.outputs.append(output(i, (-1, -1)))
             self.outputVals.append(0)
+            self.logicBlocks.append(logicBlock([], [], ""))
+
+    def blockVal(self, block):
+        return self.outputVals[self.logicBlocks.index(block)]
 
     def right(self): return self.RDcorner[0]
     def left(self): return self.LUcorner[0]
@@ -88,21 +111,17 @@ class sceneOutput:
     def height(self): return self.bottom()-self.top()
 
 
-addedBtnCount = 0
-color = (255, 255, 255) # white
-color_light = (170, 170, 170)
-color_dark = (100, 100, 100)
-color_text = (40, 40, 40)
-color_black = (0,0,0)
-
-def add_button(btnlist, text):
+def add_button(btnlist, text, logicBtn):
     btnlist.append(button(len(btnlist)+1,
                           (110+addedBtnCount*120, 680),
                           color_dark,
                           True,
                           [input(0, (-1, -1)), input(0, (-1, -1))],
-                          [output(0, (-1, -1)), output(0, (-1, -1))],
-                          text, ""
+                          [output(0, (-1, -1))],
+                          text,
+                          "",
+                          0,
+                          logicBtn
                           ))
 
 def update_btn_pos(btnlist, index, pos): #pos refers to the center coordinate of the button
@@ -127,6 +146,38 @@ def getOutputs(buttonList):
             connections.append([t.right(), buttonList[i].top() + buttonList[i].height()*(j+0.5)/l,i, j, l])
     return connections
 
+def showVal(button):
+    button.text = smallfont.render(str(button.outputValue), True, color_black)
+
+
+
+
+def updateV2(block):
+    # TODO: add bool that tells wether the outputval has been updated during this iteration
+    if block.operation == "&":
+        values = []
+        tot = len(block.children)
+        for i in range(tot): # TODO: consider if tot should be replaced by len(inputs)
+            values.append(updateV2(block.children[i]))
+        val = 1
+        for i in range(len(values)):
+            val = val & values[i]
+        return val
+    if block.operation == "c":
+        try:
+            return updateV2(block.children[0])
+        except IndexError:
+            return 0
+    if block.operation == "":
+        return block.value
+
+addedBtnCount = 0
+color = (255, 255, 255) # white
+color_light = (170, 170, 170)
+color_dark = (100, 100, 100)
+color_text = (40, 40, 40)
+color_black = (0,0,0)
+
 
 
 pygame.init()
@@ -143,17 +194,18 @@ smallfont = pygame.font.SysFont('Corbel', 35)
 text = smallfont.render('quit', True, color)
 
 sceneOutput = sceneOutput(60, 680, 100, 2)
-quitButton = button(0, (10, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "quit", "pygame.quit")
-addButton = button(1, (130, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "add", "addBtn")
+quitButton = button(0, (10, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "quit", "pygame.quit", 0, logicBlock([], [], ""))
+addButton = button(1, (130, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "add", "addBtn", 0, logicBlock([], [], ""))
+outputVal = button(2, (1000, 400), color_text, True, [input(0, (-1, -1))], [], "", "showVal", 0, logicBlock([], [], "c"))
+# TODO: investigate why outputVal btn doesn't move
 
+logicBlocks = []
 funcButtons = []
-for i in range(2): #TODO: the positions of the buttons are wrong, fix this
+for i in range(2): # TODO: the positions of the buttons are wrong, fix this
     funcButtons.append(functionalButton((30, 300+i*200), 30, 30, "0", "binary", i))
 
-buttons = [sceneOutput, quitButton, addButton]
+buttons = [sceneOutput, quitButton, addButton, outputVal]
 connectionList = []
-
-
 
 dragging = False
 dragLine = False
@@ -161,13 +213,13 @@ moveInfo = [(0,0),(0,0),-1]
 lineStart = [0,0,0,0]
 # = mouseCoords, buttonCoords, i
 
-commandDictionary = {"pygame.quit": pygame.quit, "addBtn": addButton}
+#commandDictionary = {"pygame.quit": pygame.quit, "addBtn": addButton, "showVal": showVal}
 
 
 while True:
     mouse = pygame.mouse.get_pos()
 
-    outputList = getOutputs(buttons)
+    outputList = getOutputs(buttons) #[x, y, btnInd, outputInd, totOutputs]
     inputList = getInputs(buttons)
 
     for ev in pygame.event.get():
@@ -180,13 +232,14 @@ while True:
             for i in range(len(outputList)):
                 if outputList[i][0]-7 <= mouse[0] <= outputList[i][0]+7 and outputList[i][1]-7 <= mouse[1] <= outputList[i][1]+7:
                     dragLine = True
-                    print(outputList)
+                    #print(outputList)
                     lineStart = outputList[i]
-                    print(i, lineStart)
+                    #print(i, lineStart)
             # check if we are clicking a functional button
             for i in range(len(funcButtons)):
                 if funcButtons[i].LUcorner[0] <= mouse[0] <= funcButtons[i].LUcorner[0] + funcButtons[i].width and funcButtons[i].LUcorner[1] <= mouse[1] <= funcButtons[i].LUcorner[1] + funcButtons[i].height:
                     sceneOutput.outputVals[i] = (sceneOutput.outputVals[i]+1)%2
+                    sceneOutput.logicBlocks[i].value = sceneOutput.outputVals[i]
             # check if we are clicking a button
             for i in range(1, len(buttons)):
                 if dragLine:
@@ -196,8 +249,11 @@ while True:
                     if buttons[i].command == 'pygame.quit':
                         pygame.quit()
                     elif buttons[i].command == 'addBtn':
-                        add_button(buttons, "test")
+                        logicBlocks.append(logicBlock([], [], "&"))
+                        add_button(buttons, "AND", logicBlocks[-1])
                         addedBtnCount += 1
+                    elif buttons[i].command == 'showVal':
+                        showVal(buttons[i]) # TODO: should update automatically
 
                     elif buttons[i].draggable:
                         dragging = True
@@ -215,6 +271,11 @@ while True:
                 for i in range(len(inputList)):
                     if inputList[i][0] - 7 <= mouse[0] <= inputList[i][0] + 7 and inputList[i][1] - 7 <= mouse[1] <= inputList[i][1] + 7:
                         buttons[inputList[i][2]].inputs[inputList[i][3]].connections = (lineStart[2], lineStart[3])
+                        # TODO: check if bonds should be broken
+                        if lineStart[2] < 2: # TODO: replace with len(scene outputs)
+                            bond(buttons[inputList[i][2]].logicBlock, buttons[0].logicBlocks[lineStart[3]])
+                        else:
+                            bond(buttons[inputList[i][2]].logicBlock, buttons[lineStart[2]].logicBlock) #
 
     screen.fill((60, 60, 60))
     pygame.draw.line(screen, color_black, (0, 60), (1500, 60))
@@ -284,7 +345,6 @@ while True:
                           (outputIds[1] + 0.5) / (outputC))
                 pygame.draw.line(screen, (0, 0, 0), inLoc, outLoc)
 
+    buttons[3].outputValue = updateV2(buttons[3].logicBlock)
     # updates the frames of the game
-    #[print(buttons[1].inputs[i].connections) for i in range(len(buttons[1].inputs))] # in a way, only inputs exist
-    #print("")
     pygame.display.update()
