@@ -111,13 +111,14 @@ class sceneOutput:
     def height(self): return self.bottom()-self.top()
 
 
-def add_button(btnlist, text, logicBtn):
+def add_button(btnlist, text, logicBtn, inputs, outputs):
     btnlist.append(button(len(btnlist)+1,
-                          (110+addedBtnCount*120, 680),
+                          #(110+addedBtnCount*120, 680),
+                          (110, 680),
                           color_dark,
                           True,
-                          [input(0, (-1, -1)), input(0, (-1, -1))],
-                          [output(0, (-1, -1))],
+                          inputs,
+                          outputs,
                           text,
                           "",
                           0,
@@ -155,6 +156,7 @@ def showVal(button):
 def updateV2(block):
     # TODO: add bool that tells wether the outputval has been updated during this iteration
     if block.operation == "&":
+        #print("&")
         values = []
         tot = len(block.children)
         for i in range(tot): # TODO: consider if tot should be replaced by len(inputs)
@@ -163,12 +165,19 @@ def updateV2(block):
         for i in range(len(values)):
             val = val & values[i]
         return val
+    if block.operation == "!":
+        #print("!")
+        temp = updateV2(block.children[0])
+        if temp == 0: return 1
+        else: return 0
     if block.operation == "c":
+        #print("c")
         try:
             return updateV2(block.children[0])
         except IndexError:
             return 0
     if block.operation == "":
+        #print("empty")
         return block.value
 
 addedBtnCount = 0
@@ -195,8 +204,9 @@ text = smallfont.render('quit', True, color)
 
 sceneOutput = sceneOutput(60, 680, 100, 2)
 quitButton = button(0, (10, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "quit", "pygame.quit", 0, logicBlock([], [], ""))
-addButton = button(1, (130, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "add", "addBtn", 0, logicBlock([], [], ""))
-outputVal = button(2, (1000, 400), color_text, True, [input(0, (-1, -1))], [], "", "showVal", 0, logicBlock([], [], "c"))
+andButton = button(1, (130, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "and", "andBtn", 0, logicBlock([], [], ""))
+notButton = button(2, (250, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "not", "invBtn", 0, logicBlock([], [], ""))
+outputVal = button(3, (1000, 400), color_text, True, [input(0, (-1, -1))], [], "", "showVal", 0, logicBlock([], [], "c"))
 # TODO: investigate why outputVal btn doesn't move
 
 logicBlocks = []
@@ -204,7 +214,7 @@ funcButtons = []
 for i in range(2): # TODO: the positions of the buttons are wrong, fix this
     funcButtons.append(functionalButton((30, 300+i*200), 30, 30, "0", "binary", i))
 
-buttons = [sceneOutput, quitButton, addButton, outputVal]
+buttons = [sceneOutput, quitButton, andButton, notButton, outputVal]
 connectionList = []
 
 dragging = False
@@ -213,7 +223,7 @@ moveInfo = [(0,0),(0,0),-1]
 lineStart = [0,0,0,0]
 # = mouseCoords, buttonCoords, i
 
-#commandDictionary = {"pygame.quit": pygame.quit, "addBtn": addButton, "showVal": showVal}
+#commandDictionary = {"pygame.quit": pygame.quit, "andBtn": andButton, "showVal": showVal}
 
 
 while True:
@@ -232,9 +242,7 @@ while True:
             for i in range(len(outputList)):
                 if outputList[i][0]-7 <= mouse[0] <= outputList[i][0]+7 and outputList[i][1]-7 <= mouse[1] <= outputList[i][1]+7:
                     dragLine = True
-                    #print(outputList)
                     lineStart = outputList[i]
-                    #print(i, lineStart)
             # check if we are clicking a functional button
             for i in range(len(funcButtons)):
                 if funcButtons[i].LUcorner[0] <= mouse[0] <= funcButtons[i].LUcorner[0] + funcButtons[i].width and funcButtons[i].LUcorner[1] <= mouse[1] <= funcButtons[i].LUcorner[1] + funcButtons[i].height:
@@ -248,9 +256,13 @@ while True:
                 if buttons[i].left() <= mouse[0] <= buttons[i].right() and buttons[i].top() <= mouse[1] <= buttons[i].bottom():
                     if buttons[i].command == 'pygame.quit':
                         pygame.quit()
-                    elif buttons[i].command == 'addBtn':
+                    elif buttons[i].command == 'andBtn':
                         logicBlocks.append(logicBlock([], [], "&"))
-                        add_button(buttons, "AND", logicBlocks[-1])
+                        add_button(buttons, "AND", logicBlocks[-1], [input(0, (-1, -1)), input(0, (-1, -1))], [output(0, (-1, -1))])
+                        addedBtnCount += 1
+                    elif buttons[i].command == 'invBtn':
+                        logicBlocks.append(logicBlock([], [], "!"))
+                        add_button(buttons, "NOT", logicBlocks[-1], [input(0, (-1, -1))], [output(0, (-1, -1))])
                         addedBtnCount += 1
                     elif buttons[i].command == 'showVal':
                         showVal(buttons[i]) # TODO: should update automatically
@@ -345,6 +357,7 @@ while True:
                           (outputIds[1] + 0.5) / (outputC))
                 pygame.draw.line(screen, (0, 0, 0), inLoc, outLoc)
 
-    buttons[3].outputValue = updateV2(buttons[3].logicBlock)
+    buttons[4].outputValue = updateV2(buttons[4].logicBlock)
+
     # updates the frames of the game
     pygame.display.update()
