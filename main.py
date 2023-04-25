@@ -202,7 +202,16 @@ def updateV2(block):
         return block.value
 
 def addSceneOutput(funcBtns, sOutput):
-    funcBtns.append()
+    tot = len(sOutput.outputs)
+    c = 0
+    for i in range(len(funcBtns)):
+        if funcBtns[i].function == "binary":
+            yCoord = sOutput.height() * (0.5 + c) / (tot + 1) + 45
+            funcBtns[i].LUcorner = (funcBtns[i].LUcorner[0], yCoord)
+            c += 1
+    yCoord = sOutput.height() * (0.5 + c) / (tot + 1) + 45
+    funcBtns.append(functionalButton((30, yCoord), 30, 30, "0", "binary", tot))
+    sOutput.addOutput()
 
 def removeSceneOutput(funcBtns, sOutput, btns):
     tot = len(sOutput.outputs)
@@ -251,6 +260,7 @@ notButton = button(2, (250, 10), color_text, False, [input(0, (-1, -1))], [outpu
 outputVal = button(3, (1000, 400), color_text, True, [input(0, (-1, -1))], [], "", "showVal", 0, logicBlock([], [], "c", -1))
 # TODO: investigate why outputVal btn doesn't move
 rmOutput = button(0, (370, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "rmOp", "rmOutput", 0, logicBlock([], [], "", -1))
+addOutput = button(0, (490, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "adOp", "addOutput", 0, logicBlock([], [], "", -1))
 
 
 
@@ -259,7 +269,7 @@ funcButtons = []
 for i in range(len(sceneOutput.outputs)): # TODO: the positions of the buttons are wrong, fix this CHECK
     yCoord = sceneOutput.height()*(0.5+i)/len(sceneOutput.outputs)+45
     funcButtons.append(functionalButton((30, yCoord), 30, 30, "0", "binary", i))
-buttons = [sceneOutput, quitButton, andButton, notButton, outputVal, rmOutput]
+buttons = [sceneOutput, quitButton, andButton, notButton, outputVal, rmOutput, addOutput]
 connectionList = []
 
 dragging = False
@@ -310,6 +320,8 @@ while True:
                         showVal(buttons[i]) # TODO: should update automatically
                     elif buttons[i].command == 'rmOutput':
                         removeSceneOutput(funcButtons, sceneOutput, buttons)
+                    elif buttons[i].command == 'addOutput':
+                        addSceneOutput(funcButtons, sceneOutput)
                     elif buttons[i].draggable:
                         dragging = True
                         moveInfo = [mouse, buttons[i].LUcorner, i]
