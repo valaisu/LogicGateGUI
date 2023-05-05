@@ -3,13 +3,13 @@
 # for example from
 # https://www.youtube.com/watch?v=QZwneRb-zqA&t=194s
 
-# TODO: output data from the scene CHECK
-# TODO: change the values of the data coming n to the scene CHECK
 # TODO: (optional) add tools for editing the buttons/connections
-# TODO: make the buttons represent logical ports CHECK
+# TODO: save buttons to database
+# TODO: once a button is saved, it can be added to the scene
+# TODO: add ability to add more inputs to the final button
 
 import pygame
-# from typing import Type
+# from typing import Type <- maybe would make thing simpler
 
 
 class logicBlock:
@@ -21,7 +21,7 @@ class logicBlock:
         self.value = 0
 
 
-def bond(parent, child, ind):
+def bond(parent, child, ind): # logicBlock, logicBlock, int
     for i in range(len(parent.children)):
         if parent.children[i].index == ind:
             parent.children[i].parent = []
@@ -124,17 +124,15 @@ class sceneOutput:
         outputList = []
         l = len(self.outputs)
         h = self.bottom()
-        print(h)
         for i in range(l):
-            print(i, l, (i+1)/(l+1)*h)
+            #print(i, l, (i+1)/(l+1)*h)
             outputList.append((self.right(), 120+(i+1)/(l+1)*h))
         return outputList
     def height(self): return self.bottom()-self.top()
 
 
-def add_button(btnlist, text, logicBtn, inputs, outputs):
+def add_button(btnlist, text, logicBtn, inputs, outputs): # list[button], str, logicBlock, input, output
     btnlist.append(button(len(btnlist)+1,
-                          #(110+addedBtnCount*120, 680),
                           (110, 680),
                           color_dark,
                           True,
@@ -146,35 +144,35 @@ def add_button(btnlist, text, logicBtn, inputs, outputs):
                           logicBtn
                           ))
 
-def update_btn_pos(btnlist, index, pos): #pos refers to the center coordinate of the button
+def updateBtnPos(btnlist, index, pos): # List[button], int, (int, int)
     btnlist[index].LUcorner = (pos[0] - btnlist[index].width/2, pos[1] - btnlist[index].height()/2)
 
 
-def getInputs(buttonList):
+def getInputs(buttonList): # List[button]
     connections = []
     for i in range(len(buttonList)):
         if i != 0:
             l = len(buttonList[i].inputs)
             for j in range(l):
                 connections.append([buttonList[i].left(), buttonList[i].top() + buttonList[i].height()*(j+0.5)/l, i, j])
-    return connections # returns a list of [btn left, btn right, btn index, input index]
+    return connections # returns a list of [btn left, input y coord, btn index, input index]
 
-def getOutputs(buttonList):
+
+def getOutputs(buttonList): # List[button]
     connections = []
     for i in range(len(buttonList)):
         l = len(buttonList[i].outputs)
         for j in range(l):
             t = buttonList[i]
             connections.append([t.right(), buttonList[i].top() + buttonList[i].height()*(j+0.5)/l,i, j, l])
-    return connections
+    return connections # returns a list of [btn right, output y coord, btn index, input index]
 
-def showVal(button):
+
+def showVal(button): # button
     button.text = smallfont.render(str(button.outputValue), True, color_black)
 
 
-
-
-def updateV2(block):
+def updateV2(block): # block
     # TODO: add bool that tells wether the outputval has been updated during this iteration
     if block.operation == "&":
         #print("&")
@@ -186,22 +184,22 @@ def updateV2(block):
         for i in range(len(values)):
             val = val & values[i]
         return val
-    if block.operation == "!":
+    elif block.operation == "!":
         #print("!")
         temp = updateV2(block.children[0])
         if temp == 0: return 1
         else: return 0
-    if block.operation == "c":
+    elif block.operation == "c":
         #print("c")
         try:
             return updateV2(block.children[0])
         except IndexError:
             return 0
-    if block.operation == "":
+    elif block.operation == "":
         #print("empty")
         return block.value
 
-def addSceneOutput(funcBtns, sOutput):
+def addSceneOutput(funcBtns, sOutput): # List[functionalButton], sceneOutput
     tot = len(sOutput.outputs)
     c = 0
     for i in range(len(funcBtns)):
@@ -213,7 +211,7 @@ def addSceneOutput(funcBtns, sOutput):
     funcBtns.append(functionalButton((30, yCoord), 30, 30, "0", "binary", tot))
     sOutput.addOutput()
 
-def removeSceneOutput(funcBtns, sOutput, btns):
+def removeSceneOutput(funcBtns, sOutput, btns): # List[functionalButton], sceneOutput, List[button]
     tot = len(sOutput.outputs)
     c = 0
     for i in range(len(funcBtns)):
@@ -229,6 +227,58 @@ def removeSceneOutput(funcBtns, sOutput, btns):
             if btns[i].inputs[j].connections == (0, tot-1):
                 btns[i].inputs[j].connections = (-1, -1)
                 #return (i, j)
+
+
+def sceneToButton(btns): # List[button]
+    # find a buttons with function "c" (should only be 1)
+    # recursively go through all other buttons
+    startInd = 1
+    while True:
+        if btns[startInd].logicBlock.operation == 'c':
+            break
+        startInd += 1
+    print(startInd, btns[startInd].logicBlock.operation)
+    taskList = [] # information will be stored here in format
+    # List[operation participant participant...;]
+    # for example string "&01;" would mean AND operation between values of
+    # operations at indices 0 and 1. A valid string would also for example be
+    # "!0;". Mere ";" means this place is occupied by one of sceneOutputs values
+    def createTaskList(block): # logicBlock
+        #print(block.operation, block.children)
+        if block.operation == "&":
+            createTaskList(block.children[0])
+            #print("and")
+            val0 = len(taskList)-1
+            createTaskList(block.children[1])
+            val1 = len(taskList)-1
+            taskList.append(["&", val0, val1])
+        elif block.operation == "!":
+            createTaskList(block.children[0])
+            val0 = len(taskList)-1
+            taskList.append(["!", val0])
+            #print("not")
+        elif block.operation == "":
+            #print("space")
+            taskList.append([""])
+
+    def taskListToText(taskList): # List[str]
+        text = ""
+        for i in range(len(taskList)):
+            text += ''.join(map(str, taskList[i])) + ';'
+        return text + '\n'
+
+    createTaskList(btns[startInd].logicBlock.children[0])
+    taskList.append(["c", len(taskList)-1])
+
+    f = open("buttonDB.txt", "a")
+    f.write(taskListToText(taskList))
+    f.close()
+
+
+def printRelations(block): # logicBlock
+    for i in range(len(block.children)):
+        printRelations(block.children[i])
+    print("rel: " + str(block.operation))
 
 
 addedBtnCount = 0
@@ -261,6 +311,7 @@ outputVal = button(3, (1000, 400), color_text, True, [input(0, (-1, -1))], [], "
 # TODO: investigate why outputVal btn doesn't move
 rmOutput = button(0, (370, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "rmOp", "rmOutput", 0, logicBlock([], [], "", -1))
 addOutput = button(0, (490, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "adOp", "addOutput", 0, logicBlock([], [], "", -1))
+buttonToDb = button(0, (1000, 10), color_text, False, [input(0, (-1, -1))], [output(0, (-1, -1))], "toDB", "buttonToDb", 0, logicBlock([], [], "", -1))
 
 
 
@@ -269,7 +320,7 @@ funcButtons = []
 for i in range(len(sceneOutput.outputs)): # TODO: the positions of the buttons are wrong, fix this CHECK
     yCoord = sceneOutput.height()*(0.5+i)/len(sceneOutput.outputs)+45
     funcButtons.append(functionalButton((30, yCoord), 30, 30, "0", "binary", i))
-buttons = [sceneOutput, quitButton, andButton, notButton, outputVal, rmOutput, addOutput]
+buttons = [sceneOutput, quitButton, andButton, notButton, outputVal, rmOutput, addOutput, buttonToDb]
 connectionList = []
 
 dragging = False
@@ -318,10 +369,14 @@ while True:
                         addedBtnCount += 1
                     elif buttons[i].command == 'showVal':
                         showVal(buttons[i]) # TODO: should update automatically
+                        print("----------------")
+                        printRelations(buttons[i].logicBlock)
                     elif buttons[i].command == 'rmOutput':
                         removeSceneOutput(funcButtons, sceneOutput, buttons)
                     elif buttons[i].command == 'addOutput':
                         addSceneOutput(funcButtons, sceneOutput)
+                    elif buttons[i].command == 'buttonToDb':
+                        sceneToButton(buttons)
                     elif buttons[i].draggable:
                         dragging = True
                         moveInfo = [mouse, buttons[i].LUcorner, i]
@@ -330,7 +385,7 @@ while True:
             # if we were dragging a button, drop it
             if dragging:
                 dragging = False
-                update_btn_pos(buttons, moveInfo[2], mouse)
+                updateBtnPos(buttons, moveInfo[2], mouse)
                 buttons[moveInfo[2]].LUcorner = (mouse[0] - buttons[moveInfo[2]].width / 2, mouse[1] - buttons[moveInfo[2]].height()/2)
             # if we were dragging a line, connect it provided we are close enough to an input
             if dragLine:
@@ -338,26 +393,23 @@ while True:
                 for i in range(len(inputList)):
                     if inputList[i][0] - 7 <= mouse[0] <= inputList[i][0] + 7 and inputList[i][1] - 7 <= mouse[1] <= inputList[i][1] + 7:
                         buttons[inputList[i][2]].inputs[inputList[i][3]].connections = (lineStart[2], lineStart[3])
-                        # TODO: check if bonds should be broken CHECK
-                        if lineStart[2] < 2: # TODO: replace with len(scene outputs)
-                            bond(buttons[inputList[i][2]].logicBlock, buttons[0].logicBlocks[lineStart[3]], lineStart[3])
+                        if lineStart[2] < len(buttons[0].outputs):
+                            bond(buttons[inputList[i][2]].logicBlock, buttons[0].logicBlocks[lineStart[3]], inputList[i][3])
                         else:
-                            bond(buttons[inputList[i][2]].logicBlock, buttons[lineStart[2]].logicBlock, lineStart[3]) #
+                            bond(buttons[inputList[i][2]].logicBlock, buttons[lineStart[2]].logicBlock, inputList[i][3]) #
 
     screen.fill((60, 60, 60))
     pygame.draw.line(screen, color_black, (0, 60), (1500, 60))
     pygame.draw.line(screen, color_black, (0, 740), (1500, 740))
-    #pygame.draw.circle(screen, color_black, (100, 215), 8)
 
     # Draw the scene output
     pygame.draw.rect(screen, color_light, [0, sceneOutput.top(), sceneOutput.right(), sceneOutput.bottom()])
     outputPlaces = sceneOutput.getOutputPos()
-    print(outputPlaces)
     for i in range(len(outputPlaces)):
         pygame.draw.circle(screen, color_black, (outputList[i][0], outputList[i][1]), 5)
 
     # DRAWING THE BUTTONS
-    # functional buttons
+    # functional buttons (currently only the 1/0 outputs)
     for i in range(len(funcButtons)):
         if funcButtons[i].LUcorner[0] <= mouse[0] <= funcButtons[i].LUcorner[0]+funcButtons[i].width and funcButtons[i].LUcorner[1] <= mouse[1] <= funcButtons[i].LUcorner[1]+funcButtons[i].height:
             pygame.draw.rect(screen, color_light, [funcButtons[i].LUcorner[0], funcButtons[i].LUcorner[1], funcButtons[i].width, funcButtons[i].height])
